@@ -2,12 +2,64 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>spotify-webapp</title>
+    <meta name="theme-color" content="#121212" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Spotify" />
+    
+    <!-- PWA Icons -->
+    <link rel="icon" type="image/png" href="https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/spotify_icon_192_m8j7u4.png" />
+    <link rel="apple-touch-icon" href="https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/spotify_icon_192_m8j7u4.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-startup-image" href="https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/spotify_icon_512_qj9k1z.png" />
+
+    <!-- Viewport for Mobile Apps -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    
+    <title>Spotify Web Player</title>
+
+    <style>
+      :root {
+        --spotify-green: #1DB954;
+        --spotify-black: #121212;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: black;
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior-y: none;
+        user-select: none;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => {
+              console.log('Service Worker registered', reg);
+              // Check for updates
+              reg.onupdatefound = () => {
+                const installingWorker = reg.installing;
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('New content available, please refresh.');
+                  }
+                };
+              };
+            })
+            .catch(err => console.error('Service Worker registration failed', err));
+        });
+      }
+    </script>
   </body>
 </html>
