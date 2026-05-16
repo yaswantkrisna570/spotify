@@ -48,6 +48,13 @@ const usePlayerStore = create(
             }
           }
         });
+        audio.addEventListener('progress', () => {
+          if (audio.buffered.length > 0) {
+            const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+            set({ buffered: bufferedEnd });
+          }
+        });
+
         audio.addEventListener('ended', () => {
           set({ _isFadingOut: false });
           const { repeatMode, currentSongIndex, queue } = get();
@@ -99,16 +106,22 @@ const usePlayerStore = create(
         isFullScreen: false,
         likedSongs: [],
         recentlyPlayed: [],
+        recentlyPlayedPlaylists: [],
+        recentSearches: [],
+        playCounts: {}, // { songId: count }
+        toast: { message: '', type: 'info', visible: false },
         customPlaylists: [],
         folders: [],
         activeJam: null,
         isSeeking: false,
+        buffered: 0,
         isShuffle: false,
         repeatMode: 'off',
         remotePlaylists: {},
         allSongs: [],
         _needsInitialSeek: true,
         _isFadingOut: false,
+        songDurations: {}, // Cache for song durations { songId: seconds }
 
         userProfile: {
           name: 'Yaswanth',
@@ -129,6 +142,8 @@ const usePlayerStore = create(
         // Actions
         togglePlay: () => {
           const { currentTrack, volume } = get();
+          if (!currentTrack) return;
+          
           const isCorrectSource = audio.src && audio.src.includes(currentTrack.audioUrl);
           
           if (!isCorrectSource) {
@@ -141,7 +156,11 @@ const usePlayerStore = create(
             set({ _isFadingOut: false });
             audio.play().then(() => {
               fadeAudio(volume, 800);
-            }).catch(e => console.warn("Playback interrupted:", e));
+              get().preloadNextTrack(); // Preload next after starting
+            }).catch(e => {
+              console.warn("Playback interrupted:", e);
+              set({ error: "Playback failed. Please try again." });
+            });
           } else {
             fadeAudio(0, 500, () => {
               audio.pause();
@@ -152,22 +171,32 @@ const usePlayerStore = create(
 
         setTrackByIndex: (idx) => {
           const { queue, volume, isPlaying } = get();
-          const track = queue[idx];
+          const track = queue?.[idx];
           if (!track) return;
           
           const playNew = () => {
-            audio.src = track.audioUrl;
-            audio.volume = 0;
-            audio.load();
-            audio.play().then(() => {
-              fadeAudio(volume, 1000);
-            }).catch(e => console.warn("Playback failed", e));
-            set({ currentTrack: track, currentSongIndex: idx, currentTime: 0, isLoading: true, _needsInitialSeek: false, _isFadingOut: false });
-            get().addToRecentlyPlayed(track);
+            try {
+              audio.src = track.audioUrl;
+              audio.volume = 0;
+              audio.load();
+              audio.play().then(() => {
+                // Smooth fade in
+                fadeAudio(volume, 1200);
+                get().preloadNextTrack();
+              }).catch(e => {
+                console.warn("Playback failed", e);
+                set({ error: "Failed to play track. Checking source..." });
+              });
+              set({ currentTrack: track, currentSongIndex: idx, currentTime: 0, isLoading: true, _needsInitialSeek: false, _isFadingOut: false });
+              get().addToRecentlyPlayed(track);
+            } catch (err) {
+              console.error("Critical playback error:", err);
+            }
           };
 
           if (isPlaying) {
-            fadeAudio(0, 400, playNew);
+            // Quick fade out of current track
+            fadeAudio(0, 300, playNew);
           } else {
             playNew();
           }
@@ -180,13 +209,43 @@ const usePlayerStore = create(
         },
 
         addToRecentlyPlayed: (track) => {
+          if (!track) return;
           set((state) => {
             const filtered = state.recentlyPlayed.filter((t) => t.id !== track.id);
+            const newPlayCounts = { ...state.playCounts, [track.id]: (state.playCounts[track.id] || 0) + 1 };
             return {
               recentlyPlayed: [track, ...filtered].slice(0, 10),
+              playCounts: newPlayCounts
             };
           });
         },
+        
+        showToast: (message, type = 'info') => {
+          set({ toast: { message, type, visible: true } });
+          setTimeout(() => set({ toast: { message: '', type: 'info', visible: false } }), 3000);
+        },
+        
+        addToRecentPlaylists: (playlist) => {
+          set((state) => {
+            if (!playlist || !playlist.id) return state;
+            const filtered = state.recentlyPlayedPlaylists.filter((p) => p.id !== playlist.id);
+            return {
+              recentlyPlayedPlaylists: [playlist, ...filtered].slice(0, 10),
+            };
+          });
+        },
+
+        addToRecentSearches: (query) => {
+          if (!query || query.trim() === '') return;
+          set((state) => {
+            const filtered = state.recentSearches.filter((q) => q.toLowerCase() !== query.toLowerCase());
+            return {
+              recentSearches: [query, ...filtered].slice(0, 5),
+            };
+          });
+        },
+        
+        clearRecentSearches: () => set({ recentSearches: [] }),
 
         nextTrack: () => {
           const { queue, currentSongIndex, isShuffle, repeatMode } = get();
@@ -228,6 +287,20 @@ const usePlayerStore = create(
           get().setTrackByIndex(idx);
         },
 
+        removeFromQueue: (id) => {
+          set((state) => {
+            const newQueue = state.queue.filter(t => t.id !== id);
+            // If the removed track was the current one, we might need to adjust index
+            // But usually Spotify only allows removing future tracks or just re-indexing
+            return { queue: newQueue };
+          });
+        },
+        
+        clearQueue: () => {
+          const { currentTrack } = get();
+          set({ queue: currentTrack ? [currentTrack] : [], currentSongIndex: 0 });
+        },
+
         seek: (time) => {
           if (isFinite(time)) {
             audio.currentTime = time;
@@ -241,11 +314,15 @@ const usePlayerStore = create(
         // UI State
         toggleFullScreen: () => set(s => ({ isFullScreen: !s.isFullScreen })),
         toggleLike: (track) => set(s => {
+          if (!track) return s;
           const isLiked = s.likedSongs.some(t => t.id === track.id);
           return { likedSongs: isLiked ? s.likedSongs.filter(t => t.id !== track.id) : [...s.likedSongs, track] };
         }),
         toggleShuffle: () => set(s => ({ isShuffle: !s.isShuffle })),
         toggleRepeat: () => set(s => {
+          const modes = ['off', 'all', 'track'];
+          const currentIdx = modes.indexOf(s.repeatMode);
+          const nextIdx = (currentIdx + 1) % modes.length;
           return { repeatMode: modes[nextIdx] };
         }),
         setRemotePlaylists: (playlists) => set({ remotePlaylists: playlists }),
@@ -253,43 +330,52 @@ const usePlayerStore = create(
 
         updateProfile: (updates) => set(s => ({ userProfile: { ...s.userProfile, ...updates } })),
         updateSettings: (updates) => {
-          const prevQuality = get().userSettings.audioQuality;
-          set(s => ({ userSettings: { ...s.userSettings, ...updates } }));
-          
-          if (updates.audioQuality && updates.audioQuality !== prevQuality && get().isPlaying) {
-            set({ isLoading: true });
-            fadeAudio(0, 300, () => {
-              setTimeout(() => {
-                fadeAudio(get().volume, 500);
-                set({ isLoading: false });
-              }, 800);
-            });
+          try {
+            const prevQuality = get().userSettings.audioQuality;
+            set(s => ({ userSettings: { ...s.userSettings, ...updates } }));
+            
+            if (updates.audioQuality && updates.audioQuality !== prevQuality && get().isPlaying) {
+              set({ isLoading: true });
+              fadeAudio(0, 300, () => {
+                setTimeout(() => {
+                  fadeAudio(get().volume, 500);
+                  set({ isLoading: false });
+                }, 800);
+              });
+            }
+          } catch (e) {
+            console.error("Failed to update settings:", e);
           }
         },
         markNotificationRead: (id) => set(s => ({ notifications: s.notifications.map(n => n.id === id ? { ...n, read: true } : n) })),
         dismissNotification: (id) => set(s => ({ notifications: s.notifications.filter(n => n.id !== id) })),
         
         createPlaylist: (payload) => set(s => {
-          const name = typeof payload === 'string' ? payload : (payload.name || `My Playlist #${s.customPlaylists.length + 1}`);
-          const desc = typeof payload === 'object' ? payload.description : '';
-          const img = (typeof payload === 'object' && payload.image) ? payload.image : 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop';
-          const isCollab = typeof payload === 'object' ? payload.isCollaborative : false;
-          const isBlend = typeof payload === 'object' ? payload.isBlend : false;
-          const songs = typeof payload === 'object' && payload.songs ? payload.songs : [];
+          try {
+            const name = typeof payload === 'string' ? payload : (payload.name || `My Playlist #${s.customPlaylists.length + 1}`);
+            const desc = typeof payload === 'object' ? payload.description : '';
+            const img = (typeof payload === 'object' && payload.image) ? payload.image : 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop';
+            const isCollab = typeof payload === 'object' ? payload.isCollaborative : false;
+            const isBlend = typeof payload === 'object' ? payload.isBlend : false;
+            const songs = typeof payload === 'object' && payload.songs ? payload.songs : [];
 
-          return {
-            customPlaylists: [...s.customPlaylists, {
-              id: `custom-${Date.now()}`,
-              title: name,
-              artist: s.userProfile.name || 'You',
-              image: img,
-              description: desc,
-              songs: songs,
-              gradient: 'from-[#3e3e3e] to-black',
-              isCollaborative: isCollab,
-              isBlend: isBlend
-            }]
-          };
+            return {
+              customPlaylists: [...s.customPlaylists, {
+                id: `custom-${Date.now()}`,
+                title: name,
+                artist: s.userProfile.name || 'You',
+                image: img,
+                description: desc,
+                songs: songs,
+                gradient: 'from-[#3e3e3e] to-black',
+                isCollaborative: isCollab,
+                isBlend: isBlend
+              }]
+            };
+          } catch (e) {
+            console.error("Failed to create playlist:", e);
+            return s;
+          }
         }),
         deletePlaylist: (id) => set(s => ({ customPlaylists: s.customPlaylists.filter(p => p.id !== id) })),
         
@@ -304,6 +390,7 @@ const usePlayerStore = create(
         }),
         endJam: () => set({ activeJam: null }),
         importTrack: (track) => set(s => {
+          if (!track) return s;
           const localFilesId = 'custom-local-files';
           const localFilesList = s.customPlaylists.find(p => p.id === localFilesId);
           if (localFilesList) {
@@ -329,7 +416,37 @@ const usePlayerStore = create(
           }
         }),
 
-        clearError: () => {}
+        setError: (msg) => set({ error: msg }),
+        clearError: () => set({ error: null }),
+
+        // Performance: Preload next track
+        preloadNextTrack: () => {
+          const { queue, currentSongIndex, isShuffle } = get();
+          if (!queue || queue.length === 0) return;
+          
+          let nextIdx;
+          if (isShuffle) {
+            nextIdx = Math.floor(Math.random() * queue.length);
+          } else {
+            nextIdx = (currentSongIndex + 1) % queue.length;
+          }
+          
+          const nextTrack = queue[nextIdx];
+          if (nextTrack && nextTrack.audioUrl) {
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = 'audio';
+            link.href = nextTrack.audioUrl;
+            document.head.appendChild(link);
+            // Limit preloads to avoid excessive bandwidth
+            setTimeout(() => document.head.removeChild(link), 10000);
+          }
+        },
+
+        setSongDuration: (id, duration) => set(s => ({
+          songDurations: { ...s.songDurations, [id]: duration }
+        }))
+
       };
     },
     {
@@ -337,6 +454,9 @@ const usePlayerStore = create(
       partialize: (state) => ({
         likedSongs: state.likedSongs,
         recentlyPlayed: state.recentlyPlayed,
+        recentlyPlayedPlaylists: state.recentlyPlayedPlaylists,
+        recentSearches: state.recentSearches,
+        playCounts: state.playCounts || {},
         isShuffle: state.isShuffle,
         repeatMode: state.repeatMode,
         volume: state.volume,
@@ -349,7 +469,8 @@ const usePlayerStore = create(
         notifications: state.notifications,
         customPlaylists: state.customPlaylists || [],
         folders: state.folders || [],
-        activeJam: state.activeJam || null
+        activeJam: state.activeJam || null,
+        songDurations: state.songDurations || {}
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

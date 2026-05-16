@@ -1,28 +1,28 @@
 {
-  "name": "Spotify Web Player",
+  "name": "Spotify Premium",
   "short_name": "Spotify",
-  "description": "Premium Spotify-inspired music experience. Listen to your favorite tracks anywhere.",
+  "description": "Premium music streaming experience with dynamic visuals and crossfade.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#1DB954",
+  "background_color": "#121212",
+  "theme_color": "#121212",
   "orientation": "portrait",
   "categories": ["music", "entertainment"],
   "icons": [
     {
-      "src": "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/spotify_icon_192_m8j7u4.png",
+      "src": "https://res.cloudinary.com/dwhyiypud/image/upload/v1778946254/Spotify_image_r6k3uh.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/spotify_icon_512_qj9k1z.png",
+      "src": "https://res.cloudinary.com/dwhyiypud/image/upload/v1778946254/Spotify_image_r6k3uh.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/spotify_icon_512_qj9k1z.png",
+      "src": "https://res.cloudinary.com/dwhyiypud/image/upload/v1778946254/Spotify_image_r6k3uh.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -32,21 +32,12 @@
     {
       "name": "Search",
       "url": "/search",
-      "icons": [{ "src": "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/spotify_icon_192_m8j7u4.png", "sizes": "192x192" }]
+      "icons": [{ "src": "https://res.cloudinary.com/dwhyiypud/image/upload/v1778946254/Spotify_image_r6k3uh.png", "sizes": "192x192" }]
     },
     {
       "name": "Your Library",
       "url": "/library",
-      "icons": [{ "src": "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/spotify_icon_192_m8j7u4.png", "sizes": "192x192" }]
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/screenshot1_p9j9k1.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Premium Music Interface"
+      "icons": [{ "src": "https://res.cloudinary.com/dwhyiypud/image/upload/v1778946254/Spotify_image_r6k3uh.png", "sizes": "192x192" }]
     }
   ]
 }
