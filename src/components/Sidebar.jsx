@@ -1,11 +1,14 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Library, Heart } from 'lucide-react';
+import { Home, Search, Library, Plus, Heart, Music2, LogOut, Settings } from 'lucide-react';
 import { PLAYLISTS } from '../constants/playlists';
 import usePlayerStore from '../store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
 
 const Sidebar = () => {
-  const { likedSongs } = usePlayerStore();
+  const { likedSongs } = usePlayerStore(useShallow(state => ({
+    likedSongs: state.likedSongs
+  })));
 
   return (
     <aside className="hidden md:flex flex-col w-[300px] gap-2 z-10 shrink-0">

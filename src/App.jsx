@@ -1,9 +1,10 @@
-import React, { useEffect, Suspense } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, X, CheckCircle, Info } from 'lucide-react';
+import { AlertCircle, X, CheckCircle, Info, RefreshCw } from 'lucide-react';
 
 import usePlayerStore from './store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
 import useRemotePlaylists from './hooks/useRemotePlaylists';
 
 // Components
@@ -25,17 +26,63 @@ const App = () => {
   const location = useLocation();
   const { 
     currentTrack, 
+    toast, 
     isFullScreen, 
+    activeJam,
     togglePlay,
     nextTrack,
     prevTrack,
     error, 
-    clearError,
-    toast
-  } = usePlayerStore();
+    clearError
+  } = usePlayerStore(useShallow(state => ({
+    currentTrack: state.currentTrack,
+    toast: state.toast,
+    isFullScreen: state.isFullScreen,
+    activeJam: state.activeJam,
+    togglePlay: state.togglePlay,
+    nextTrack: state.nextTrack,
+    prevTrack: state.prevTrack,
+    error: state.error,
+    clearError: state.clearError
+  })));
 
   // Fetch Remote Playlists Hook
   useRemotePlaylists();
+
+  // PWA Update State
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [swRegistration, setSwRegistration] = useState(null);
+
+  useEffect(() => {
+    const handleUpdate = (e) => {
+      setSwRegistration(e.detail);
+      setUpdateAvailable(true);
+    };
+
+    let refreshing = false;
+    const handleControllerChange = () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('pwa-update-available', handleUpdate);
+    navigator.serviceWorker?.addEventListener('controllerchange', handleControllerChange);
+
+    return () => {
+      window.removeEventListener('pwa-update-available', handleUpdate);
+      navigator.serviceWorker?.removeEventListener('controllerchange', handleControllerChange);
+    };
+  }, []);
+
+  const handleApplyUpdate = () => {
+    if (swRegistration && swRegistration.waiting) {
+      swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    } else {
+      window.location.reload(); // Fallback if SW not caught properly
+    }
+  };
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -168,6 +215,42 @@ const App = () => {
             {toast.type === 'success' && <CheckCircle size={18} />}
             {toast.type === 'info' && <Info size={18} />}
             <span className="text-sm font-bold truncate">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Premium PWA Update Popup */}
+      <AnimatePresence>
+        {updateAvailable && (
+          <motion.div
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            className="fixed top-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-max z-[250] bg-[#1db954] text-black px-4 py-3 rounded-xl shadow-2xl flex items-center justify-between gap-4 font-sans"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-black/10 rounded-full">
+                <RefreshCw size={20} />
+              </div>
+              <div>
+                <p className="font-bold text-sm">New update available</p>
+                <p className="text-xs opacity-80 font-medium">Get the latest features and fixes.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setUpdateAvailable(false)} 
+                className="px-3 py-1.5 text-xs font-bold bg-black/10 hover:bg-black/20 transition-colors rounded-full"
+              >
+                Later
+              </button>
+              <button 
+                onClick={handleApplyUpdate} 
+                className="px-4 py-1.5 text-xs font-bold bg-black text-white hover:scale-105 transition-transform rounded-full shadow-lg active:scale-95"
+              >
+                Update
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

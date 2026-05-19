@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, MoreVertical, Heart, Shuffle, SkipBack, SkipForward, Play, Repeat, Share2, ListMusic, X, Loader } from 'lucide-react';
+import { 
+  ChevronDown, MoreVertical, Heart, Shuffle, SkipBack, SkipForward, Play, 
+  Repeat, Share2, ListMusic, X, Loader, Plus, Link, Info, User, Disc 
+} from 'lucide-react';
 import usePlayerStore from '../store/usePlayerStore';
 import ProgressBar from './ProgressBar';
 import VolumeControl from './VolumeControl';
 import SongDetails from './SongDetails';
+import DynamicArtwork from './DynamicArtwork';
 
 const FullScreenPlayer = () => {
   const { 
@@ -31,6 +35,7 @@ const FullScreenPlayer = () => {
   } = usePlayerStore();
 
   const [showQueue, setShowQueue] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [playerColor, setPlayerColor] = React.useState('rgb(18, 18, 18)');
 
   const handleShare = async (e) => {
@@ -59,12 +64,12 @@ const FullScreenPlayer = () => {
   };
 
   React.useEffect(() => {
-    if (currentTrack?.image) {
+    if (currentTrack?.cover) {
       import('../utils/colorUtils').then(({ getAverageColor }) => {
-        getAverageColor(currentTrack.image).then(setPlayerColor);
+        getAverageColor(currentTrack.cover).then(setPlayerColor);
       });
     }
-  }, [currentTrack?.image]);
+  }, [currentTrack?.cover]);
 
   if (!currentTrack) return null;
   const isLiked = likedSongs.some(s => s.id === currentTrack.id);
@@ -99,41 +104,50 @@ const FullScreenPlayer = () => {
         <button onClick={(e) => { e.stopPropagation(); toggleFullScreen(); }} className="text-white p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors">
           <ChevronDown size={28} />
         </button>
-        <div className="flex flex-col items-center">
-          <span className="text-xs uppercase tracking-widest text-[#b3b3b3] font-medium">Playing from playlist</span>
-          <span className="text-sm font-bold text-white truncate max-w-[200px]">{currentTrack.title}</span>
+        <div className="flex flex-col items-center flex-1 mx-4 overflow-hidden">
+          <span className="text-[10px] uppercase tracking-widest text-[#b3b3b3] font-bold">Playing from playlist</span>
+          <span className="text-sm font-bold text-white truncate w-full text-center">{currentTrack.title}</span>
         </div>
-        <button className="text-white p-2 -mr-2 hover:bg-white/10 rounded-full transition-colors">
+        <button 
+          onClick={(e) => { e.stopPropagation(); setShowMenu(true); }}
+          className="text-white p-2 -mr-2 hover:bg-white/10 rounded-full transition-colors"
+        >
           <MoreVertical size={28} />
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 flex items-center justify-center mb-6 relative">
-        <AnimatePresence mode="wait">
-          <motion.img 
-            key={currentTrack.id}
-            initial={{ scale: 0.9, opacity: 0, rotate: -2 }}
-            animate={{ scale: 1, opacity: 1, rotate: 0 }}
-            exit={{ scale: 1.1, opacity: 0, rotate: 2 }}
-            whileHover={{ scale: 1.03 }}
-            transition={{ type: "spring", damping: 15, stiffness: 100 }}
-            src={currentTrack.image} 
-            alt={currentTrack.title} 
-            className="w-full max-h-full aspect-square object-cover rounded-md shadow-2xl shadow-black/60 object-center" 
-          />
-        </AnimatePresence>
-        <AnimatePresence>
-          {isLoading && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-md backdrop-blur-[2px] z-10"
+      <div className="flex-1 flex flex-col items-center justify-center mb-8 relative">
+        <div className="w-full max-w-[340px] aspect-square relative group">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentTrack.id}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 1.1, opacity: 0 }}
+              transition={{ type: "spring", damping: 20, stiffness: 120 }}
+              className="w-full h-full"
             >
-              <div className="w-16 h-16 rounded-full border-4 border-white/10 border-t-spotify-green animate-spin" />
+              <DynamicArtwork 
+                artist={currentTrack.artist} 
+                title={currentTrack.title} 
+                cover={currentTrack.cover} 
+                className="w-full h-full rounded-md shadow-[0_20px_50px_rgba(0,0,0,0.6)]" 
+              />
             </motion.div>
-          )}
-        </AnimatePresence>
+          </AnimatePresence>
+          <AnimatePresence>
+            {isLoading && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-md backdrop-blur-[4px] z-10"
+              >
+                <Loader size={48} className="text-spotify-green animate-spin" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       <div className="flex items-center justify-between mb-4 shrink-0">
@@ -256,10 +270,10 @@ const FullScreenPlayer = () => {
               <div className="mb-6">
                 <p className="text-sm font-bold text-[#b3b3b3] mb-4 uppercase tracking-wider px-2">Now Playing</p>
                 <div className="flex items-center gap-3 p-2 rounded-md bg-white/5">
-                  <img src={currentTrack?.image || '/album_cover_1.png'} alt="" className="w-12 h-12 rounded shadow-lg" />
+                  <img src={currentTrack?.cover || 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop'} alt="" className="w-12 h-12 rounded shadow-lg" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-spotify-green truncate">{currentTrack?.title || 'Unknown'}</p>
-                    <p className="text-sm text-[#b3b3b3] truncate">{currentTrack?.artist || 'Unknown'}</p>
+                    <p className="font-semibold text-spotify-green truncate">{currentTrack?.title || 'Untitled'}</p>
+                    <p className="text-sm text-[#b3b3b3] truncate">{currentTrack?.artist || 'Unknown Artist'}</p>
                   </div>
                 </div>
               </div>
@@ -275,12 +289,12 @@ const FullScreenPlayer = () => {
                       className="flex items-center gap-3 p-2 rounded-md hover:bg-white/5 cursor-pointer mb-2 group transition-colors relative"
                     >
                       <div className="relative shrink-0" onClick={() => setTrackByIndex(actualIdx)}>
-                        <img src={song.image || '/album_cover_1.png'} alt="" className="w-12 h-12 rounded group-hover:opacity-60 transition-opacity" />
+                        <img src={song.cover || 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop'} alt="" className="w-12 h-12 rounded group-hover:opacity-60 transition-opacity" />
                         <Play size={16} className="absolute inset-0 m-auto opacity-0 group-hover:opacity-100 text-white fill-current" />
                       </div>
                       <div className="flex-1 min-w-0" onClick={() => setTrackByIndex(actualIdx)}>
                         <p className="font-medium truncate text-white">{song.title || 'Untitled'}</p>
-                        <p className="text-sm text-[#b3b3b3] truncate">{song.artist || 'Unknown'}</p>
+                        <p className="text-sm text-[#b3b3b3] truncate">{song.artist || 'Unknown Artist'}</p>
                       </div>
                       <button 
                         onClick={(e) => { e.stopPropagation(); removeFromQueue(song.id); showToast('Removed from queue', 'info'); }}
@@ -293,6 +307,71 @@ const FullScreenPlayer = () => {
                 })}
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showMenu && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-end"
+            onClick={() => setShowMenu(false)}
+          >
+            <motion.div 
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="w-full bg-[#282828] rounded-t-3xl p-6 flex flex-col gap-1 pb-12 shadow-[0_-10px_40px_rgba(0,0,0,0.4)]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-4 mb-6 px-2">
+                <img src={currentTrack.cover || 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop'} alt="" className="w-14 h-14 rounded shadow-lg" />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-lg truncate text-white">{currentTrack.title}</h3>
+                  <p className="text-[#b3b3b3] truncate">{currentTrack.artist}</p>
+                </div>
+              </div>
+
+              {[
+                { icon: <Plus size={22} />, label: 'Add to queue', action: () => {
+                  usePlayerStore.setState(s => ({ queue: [...s.queue, currentTrack] }));
+                  showToast('Added to queue', 'success');
+                  setShowMenu(false);
+                }},
+                { icon: <Heart size={22} />, label: isLiked ? 'Liked' : 'Like', action: () => { toggleLike(currentTrack); setShowMenu(false); }, active: isLiked },
+                { icon: <Share2 size={22} />, label: 'Share', action: handleShare },
+                { icon: <Link size={22} />, label: 'Copy link', action: () => { 
+                  navigator.clipboard.writeText(window.location.href); 
+                  showToast('Link copied!', 'success');
+                  setShowMenu(false);
+                }},
+                { icon: <User size={22} />, label: 'Go to artist', action: () => setShowMenu(false) },
+                { icon: <Disc size={22} />, label: 'View album', action: () => setShowMenu(false) },
+                { icon: <Info size={22} />, label: 'Song details', action: () => {
+                  showToast(`${currentTrack.title} by ${currentTrack.artist}`, 'info');
+                  setShowMenu(false);
+                }}
+              ].map((item, idx) => (
+                <button
+                  key={idx}
+                  onClick={item.action}
+                  className={`flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-colors w-full text-left ${item.active ? 'text-spotify-green' : 'text-white'}`}
+                >
+                  <span className={item.active ? 'text-spotify-green' : 'text-[#b3b3b3]'}>{item.icon}</span>
+                  <span className="font-bold text-[15px]">{item.label}</span>
+                </button>
+              ))}
+
+              <button 
+                onClick={() => setShowMenu(false)}
+                className="mt-4 p-4 text-center font-bold text-white hover:text-spotify-green transition-colors"
+              >
+                Close
+              </button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

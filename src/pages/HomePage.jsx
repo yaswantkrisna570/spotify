@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Clock, Settings, Play } from 'lucide-react';
 import usePlayerStore from '../store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
 import { masterLibrary, PLAYLISTS } from '../constants/playlists';
 import SongItem from '../components/SongItem';
 import NotificationsDropdown from '../components/NotificationsDropdown';
@@ -13,7 +14,16 @@ import TopSongsSection from '../components/TopSongsSection';
 
 const HomePage = React.memo(() => {
   const navigate = useNavigate();
-  const { likedSongs, currentTrack, isPlaying, setQueue, toggleLike, userProfile, remotePlaylists, recentlyPlayedPlaylists } = usePlayerStore();
+  const { likedSongs, currentTrack, isPlaying, setQueue, toggleLike, userProfile, remotePlaylists, recentlyPlayedPlaylists } = usePlayerStore(useShallow(state => ({
+    likedSongs: state.likedSongs,
+    currentTrack: state.currentTrack,
+    isPlaying: state.isPlaying,
+    setQueue: state.setQueue,
+    toggleLike: state.toggleLike,
+    userProfile: state.userProfile,
+    remotePlaylists: state.remotePlaylists,
+    recentlyPlayedPlaylists: state.recentlyPlayedPlaylists
+  })));
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');

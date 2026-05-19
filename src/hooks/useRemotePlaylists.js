@@ -17,8 +17,8 @@ const useRemotePlaylists = () => {
         return;
       }
       const sources = [
-        { id: 'test_playlist', name: 'Test Playlist', url: 'https://res.cloudinary.com/dwhyiypud/raw/upload/v1778870298/Test_playlist_dnf3xq.json', color: 'from-green-900' },
-        { id: 'my_fav', name: 'My Favorites', url: 'https://res.cloudinary.com/dwhyiypud/raw/upload/v1778874197/my_fav_bak4xg.json', color: 'from-red-900' }
+        { id: 'test_playlist', name: 'Test Playlist', url: 'https://res.cloudinary.com/dwhyiypud/raw/upload/v1779210493/Test_playlist_msotfr.json', color: 'from-green-900' },
+        { id: 'my_fav', name: 'My Favorites', url: 'https://res.cloudinary.com/dwhyiypud/raw/upload/v1779210492/my_fav_vjsi6r.json', color: 'from-red-900' }
       ];
  
       try {
@@ -35,19 +35,26 @@ const useRemotePlaylists = () => {
             const songsArray = Array.isArray(data) ? data : (data.songs || []);
             
             if (songsArray.length > 0) {
-              const mappedSongs = songsArray.map((s, i) => ({
-                id: s.id || `${source.id}-${i}`,
-                title: s.title || s.name || 'Untitled',
-                artist: s.artist || s.singer || s.author || 'Unknown Artist',
-                audioUrl: s.audio || s.audioUrl || s.url,
-                image: s.cover || s.image || s.thumbnail || 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop'
-              }));
+              const mappedSongs = songsArray.map((s, i) => {
+                const title = s.title || 'Untitled';
+                const artist = s.artist || 'Unknown Artist';
+                const cover = s.cover || 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop';
+                const audio = s.audio;
+
+                return {
+                  id: s.id || `${source.id}-${i}`,
+                  title,
+                  artist,
+                  audio,
+                  cover
+                };
+              });
  
               newRemotePlaylists[source.id] = {
                 id: source.id,
                 title: source.name,
                 artist: 'Cloudinary',
-                image: mappedSongs[0]?.image || '/album_cover_1.png',
+                image: mappedSongs[0]?.cover || '/album_cover_1.png',
                 description: `Dynamically loaded ${source.name} from Cloudinary.`,
                 gradient: `${source.color} to-black`,
                 songs: mappedSongs

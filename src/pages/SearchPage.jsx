@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import usePlayerStore from '../store/usePlayerStore';
 import { masterLibrary } from '../constants/playlists';
 import SongItem from '../components/SongItem';
@@ -10,7 +11,16 @@ import useSearch from '../hooks/useSearch';
 const SearchPage = React.memo(() => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const { likedSongs, setQueue, currentTrack, isPlaying, toggleLike, recentSearches, addToRecentSearches, clearRecentSearches } = usePlayerStore();
+  const { likedSongs, setQueue, currentTrack, isPlaying, toggleLike, recentSearches, addToRecentSearches, clearRecentSearches } = usePlayerStore(useShallow(state => ({
+    likedSongs: state.likedSongs,
+    setQueue: state.setQueue,
+    currentTrack: state.currentTrack,
+    isPlaying: state.isPlaying,
+    toggleLike: state.toggleLike,
+    recentSearches: state.recentSearches,
+    addToRecentSearches: state.addToRecentSearches,
+    clearRecentSearches: state.clearRecentSearches
+  })));
   
   const filteredSongs = useSearch(searchQuery);
   const debouncedQuery = searchQuery;

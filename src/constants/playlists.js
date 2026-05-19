@@ -4,22 +4,22 @@ export const masterLibrary = {
       id: 1,
       title: "Oru Pere Varalaaru",
       artist: "Anirudh Ravichander",
-      image: "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/oru_pere_varalaaru_tgri8o.jpg",
-      audioUrl: "https://res.cloudinary.com/dyfejeqp1/video/upload/v1778599791/Oru-Pere-Varalaaru-MassTamilan.dev_gtkwaq.mp3"
+      cover: "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/oru_pere_varalaaru_tgri8o.jpg",
+      audio: "https://res.cloudinary.com/dyfejeqp1/video/upload/v1778599791/Oru-Pere-Varalaaru-MassTamilan.dev_gtkwaq.mp3"
     },
     {
       id: 2,
       title: "Pavazha Malli",
       artist: "Sai Abhyankkar",
-      image: "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/pavazha_malli_kikgjn.jpg",
-      audioUrl: "https://res.cloudinary.com/dyfejeqp1/video/upload/v1778599792/Pavazha_Malli_elfjp3.mp3"
+      cover: "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/pavazha_malli_kikgjn.jpg",
+      audio: "https://res.cloudinary.com/dyfejeqp1/video/upload/v1778599792/Pavazha_Malli_elfjp3.mp3"
     },
     {
       id: 3,
       title: "Kutti Story",
       artist: "Anirudh Ravichander",
-      image: "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/kutti_story_jv4hke.jpg",
-      audioUrl: "https://res.cloudinary.com/dyfejeqp1/video/upload/v1778599811/Kutti-Story-MassTamilan.io_w6ule5.mp3"
+      cover: "https://res.cloudinary.com/dyfejeqp1/image/upload/v1778604366/kutti_story_jv4hke.jpg",
+      audio: "https://res.cloudinary.com/dyfejeqp1/video/upload/v1778599811/Kutti-Story-MassTamilan.io_w6ule5.mp3"
     }
   ]
 };

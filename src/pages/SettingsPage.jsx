@@ -67,6 +67,10 @@ const SettingsPage = () => {
           </div>
         </section>
       </div>
+      <div className="mt-12 text-center pb-8">
+        <p className="text-[#b3b3b3] font-bold text-sm">Spotify Clone</p>
+        <p className="text-[#b3b3b3] text-xs mt-1">Version 1.0.1</p>
+      </div>
     </div>
   );
 };

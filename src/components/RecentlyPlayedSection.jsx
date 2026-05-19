@@ -1,10 +1,15 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Play } from 'lucide-react';
+import { Play, Clock } from 'lucide-react';
 import usePlayerStore from '../store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
+import DynamicArtwork from './DynamicArtwork';
 
 const RecentlyPlayedSection = () => {
-  const { recentlyPlayed, setQueue } = usePlayerStore();
+  const { recentlyPlayed, setQueue } = usePlayerStore(useShallow(state => ({
+    recentlyPlayed: state.recentlyPlayed,
+    setQueue: state.setQueue
+  })));
   if (!recentlyPlayed || recentlyPlayed.length === 0) return null;
   return (
     <section className="px-4 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -25,7 +30,12 @@ const RecentlyPlayedSection = () => {
             onClick={() => setQueue(recentlyPlayed, index)}
           >
             <div className="relative mb-4 shadow-2xl shadow-black/60 rounded-md overflow-hidden">
-              <img src={song.image} alt={song.title} className="w-full aspect-square object-cover transform group-hover:scale-110 transition-transform duration-200" />
+              <DynamicArtwork 
+                artist={song.artist} 
+                title={song.title} 
+                cover={song.cover} 
+                className="w-full aspect-square transform group-hover:scale-110 transition-transform duration-200" 
+              />
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0 duration-150">
                 <div className="w-12 h-12 bg-spotify-green rounded-full flex items-center justify-center text-black shadow-xl hover:scale-110 active:scale-95 transition-all">
                   <Play size={24} fill="currentColor" className="ml-1" />

@@ -5,6 +5,7 @@ import usePlayerStore from '../store/usePlayerStore';
 import ProgressBar, { formatTime } from './ProgressBar';
 import VolumeControl from './VolumeControl';
 import Equalizer from './Equalizer';
+import DynamicArtwork from './DynamicArtwork';
 
 const PlayerController = () => {
   const { 
@@ -29,12 +30,12 @@ const PlayerController = () => {
   const [playerColor, setPlayerColor] = React.useState('rgb(18, 18, 18)');
 
   React.useEffect(() => {
-    if (currentTrack?.image) {
+    if (currentTrack?.cover) {
       import('../utils/colorUtils').then(({ getAverageColor }) => {
-        getAverageColor(currentTrack.image).then(setPlayerColor);
+        getAverageColor(currentTrack.cover).then(setPlayerColor);
       });
     }
-  }, [currentTrack?.image]);
+  }, [currentTrack?.cover]);
 
   if (!currentTrack) return null;
 
@@ -59,7 +60,12 @@ const PlayerController = () => {
 
         {/* Desktop & Mobile: Left Info */}
         <div className="flex items-center w-full md:w-[30%] min-w-[180px] relative z-10">
-          <img src={currentTrack.image} alt="Now Playing" className="w-10 h-10 md:w-14 md:h-14 rounded shadow-md object-cover shrink-0" loading="lazy" decoding="async" />
+          <DynamicArtwork 
+            artist={currentTrack.artist} 
+            title={currentTrack.title} 
+            cover={currentTrack.cover} 
+            className="w-10 h-10 md:w-14 md:h-14 rounded shadow-md shrink-0" 
+          />
           <div className="flex-1 ml-3 overflow-hidden flex flex-col justify-center">
             <div className="flex items-center text-sm font-semibold truncate text-white gap-2">
               <span className="truncate md:hover:underline">{currentTrack.title}</span>

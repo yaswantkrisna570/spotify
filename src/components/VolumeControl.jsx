@@ -1,9 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { VolumeX, Volume1, Volume2 } from 'lucide-react';
 import usePlayerStore from '../store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
 
 const VolumeControl = () => {
-  const { volume, setVolume } = usePlayerStore();
+  const { volume, setVolume } = usePlayerStore(useShallow(state => ({
+    volume: state.volume,
+    setVolume: state.setVolume
+  })));
   const [isHovered, setIsHovered] = useState(false);
   const volumeRef = useRef(null);
 

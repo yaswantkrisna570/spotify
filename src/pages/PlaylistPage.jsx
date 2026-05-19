@@ -2,13 +2,23 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronDown, Play, Heart, MoreVertical, Clock } from 'lucide-react';
 import usePlayerStore from '../store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
 import { masterLibrary, PLAYLISTS } from '../constants/playlists';
 import SongDuration from '../components/SongDuration';
 
 const PlaylistPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { likedSongs, setQueue, currentTrack, isPlaying, toggleLike, customPlaylists, remotePlaylists, togglePlay } = usePlayerStore();
+  const { likedSongs, setQueue, currentTrack, isPlaying, toggleLike, customPlaylists, remotePlaylists, togglePlay } = usePlayerStore(useShallow(state => ({
+    likedSongs: state.likedSongs,
+    setQueue: state.setQueue,
+    currentTrack: state.currentTrack,
+    isPlaying: state.isPlaying,
+    toggleLike: state.toggleLike,
+    customPlaylists: state.customPlaylists,
+    remotePlaylists: state.remotePlaylists,
+    togglePlay: state.togglePlay
+  })));
   const [headerOpacity, setHeaderOpacity] = React.useState(0);
   
   React.useEffect(() => {
@@ -53,7 +63,7 @@ const PlaylistPage = () => {
     playlist = {
       title: capitalizedTitle,
       artist: 'Curated by Spotify',
-      image: masterLibrary?.all?.[0]?.image || '/album_cover_1.png',
+      image: masterLibrary?.all?.[0]?.cover || '/album_cover_1.png',
       songs: masterLibrary?.all || [],
       description: `A handpicked selection of the best ${capitalizedTitle} tracks just for you.`,
       gradient: 'from-blue-900 to-black'
@@ -174,7 +184,7 @@ const PlaylistPage = () => {
             
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="w-10 h-10 relative shrink-0">
-                <img src={song.image} alt={song.title} className="w-full h-full object-cover rounded shadow-md" />
+                <img src={song.cover || 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop'} alt={song.title} className="w-full h-full object-cover rounded shadow-md" />
                 {currentTrack?.id === song.id && isPlaying && (
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded">
                     <div className="flex gap-0.5 items-end h-3">

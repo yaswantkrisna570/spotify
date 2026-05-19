@@ -1,35 +1,81 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Info, Mic2, User, Zap, Heart, BarChart2, Globe } from 'lucide-react';
+import { Info, Mic2, User, Zap, Heart, BarChart2, Globe, RefreshCcw, AlertCircle } from 'lucide-react';
+import usePlayerStore from '../store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
+import { formatTime } from './ProgressBar';
+
+// Simple in-memory cache for lyrics
+const lyricsCache = new Map();
 
 const SongDetails = ({ song, playerColor }) => {
   const [activeTab, setActiveTab] = useState('lyrics');
+  const [lyrics, setLyrics] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  const { songDurations } = usePlayerStore(useShallow(state => ({
+    songDurations: state.songDurations
+  })));
+  const cachedDuration = songDurations[song?.id] || 0;
 
-  // Simulated lyrics for premium feel
-  const simulatedLyrics = [
-    "Yeah, I'm gonna take my horse",
-    "To the old town road",
-    "I'm gonna ride 'til I can't no more",
-    "I'm gonna take my horse",
-    "To the old town road",
-    "I'm gonna ride 'til I can't no more",
-    "I got the horses in the back",
-    "Horse tack is attached",
-    "Hat is matte black",
-    "Got the boots that's black to match",
-    "Ridin' on a horse, ha",
-    "You can whip your Porsche",
-    "I been in the valley",
-    "You ain't been up off that porch, now"
-  ];
+  // Helper to clean metadata for better API matching
+  const cleanMetadata = useCallback((text) => {
+    if (!text) return '';
+    return text
+      .split('(')[0] // Remove (feat...)
+      .split('[')[0] // Remove [Official...]
+      .trim();
+  }, []);
 
-  const songDNA = {
+  const fetchLyrics = useCallback(async (artist, title) => {
+    const cleanArtist = cleanMetadata(artist);
+    const cleanTitle = cleanMetadata(title);
+    const cacheKey = `${cleanArtist}-${cleanTitle}`.toLowerCase();
+
+    if (lyricsCache.has(cacheKey)) {
+      setLyrics(lyricsCache.get(cacheKey));
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(cleanTitle)}`);
+      if (!response.ok) throw new Error('Lyrics not found');
+      
+      const data = await response.json();
+      if (data.lyrics) {
+        const formattedLyrics = data.lyrics.split('\n').filter(line => line.trim() !== '');
+        lyricsCache.set(cacheKey, formattedLyrics);
+        setLyrics(formattedLyrics);
+      } else {
+        throw new Error('Lyrics unavailable');
+      }
+    } catch (err) {
+      console.error('Lyrics fetch error:', err);
+      setError('Lyrics unavailable');
+      setLyrics(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [cleanMetadata]);
+
+  useEffect(() => {
+    if (song?.artist && song?.title) {
+      fetchLyrics(song.artist, song.title);
+    }
+  }, [song, fetchLyrics]);
+
+  const songDNA = useMemo(() => ({
     energy: 85,
     danceability: 72,
     mood: 'Happy',
     chillFactor: 40,
     intensity: 90
-  };
+  }), []);
 
   return (
     <div className="mt-8 pb-20">
@@ -56,17 +102,37 @@ const SongDetails = ({ song, playerColor }) => {
             className="bg-black/40 rounded-2xl p-6 backdrop-blur-md border border-white/5"
             style={{ backgroundColor: `${playerColor}33` }}
           >
-            <div className="flex items-center gap-2 mb-6">
-              <Mic2 size={20} className="text-spotify-green" />
-              <h3 className="text-xl font-bold">Lyrics</h3>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Mic2 size={20} className="text-spotify-green" />
+                <h3 className="text-xl font-bold">Lyrics</h3>
+              </div>
+              {loading && <RefreshCcw size={16} className="animate-spin text-[#b3b3b3]" />}
             </div>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto hide-scrollbar">
-              {simulatedLyrics.map((line, i) => (
-                <p key={i} className="text-2xl font-bold text-white/40 hover:text-white transition-colors cursor-default">
-                  {line}
-                </p>
-              ))}
-              <p className="text-[#b3b3b3] text-sm mt-8 italic">Lyrics provided by Musixmatch</p>
+
+            <div className="space-y-4 max-h-[400px] overflow-y-auto hide-scrollbar pr-2">
+              {loading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="h-8 bg-white/5 rounded-md animate-pulse" style={{ width: `${Math.random() * 40 + 40}%` }} />
+                  ))}
+                </div>
+              ) : error ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <AlertCircle size={40} className="text-[#b3b3b3] mb-4" />
+                  <p className="text-lg font-bold text-white/60">{error}</p>
+                  <p className="text-sm text-[#b3b3b3] mt-1">We couldn't find the lyrics for this song.</p>
+                </div>
+              ) : lyrics ? (
+                lyrics.map((line, i) => (
+                  <p key={i} className="text-2xl font-bold text-white/40 hover:text-white transition-all duration-300 cursor-default transform hover:scale-[1.02] origin-left">
+                    {line}
+                  </p>
+                ))
+              ) : (
+                <p className="text-[#b3b3b3] italic">No lyrics to display.</p>
+              )}
+              {lyrics && <p className="text-[#b3b3b3] text-xs mt-12 uppercase tracking-widest font-bold opacity-50">End of lyrics</p>}
             </div>
           </motion.div>
         )}
@@ -79,14 +145,14 @@ const SongDetails = ({ song, playerColor }) => {
             exit={{ opacity: 0, y: -20 }}
             className="space-y-6"
           >
-            <div className="bg-[#282828] rounded-2xl p-6 shadow-2xl">
+            <div className="bg-[#282828] rounded-2xl p-6 shadow-2xl border border-white/5">
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                 <Info size={20} className="text-blue-400" /> About the Song
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-white/5 rounded-lg">
                   <p className="text-xs text-[#b3b3b3] uppercase font-bold mb-1">Duration</p>
-                  <p className="text-lg font-bold">3:45</p>
+                  <p className="text-lg font-bold">{cachedDuration ? formatTime(cachedDuration) : '--:--'}</p>
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg">
                   <p className="text-xs text-[#b3b3b3] uppercase font-bold mb-1">Release</p>
@@ -151,7 +217,7 @@ const SongDetails = ({ song, playerColor }) => {
           >
             <div className="relative h-48 rounded-2xl overflow-hidden group">
               <img 
-                src={song.image} 
+                src={song.cover} 
                 alt={song.artist} 
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
               />
@@ -162,7 +228,7 @@ const SongDetails = ({ song, playerColor }) => {
               </div>
             </div>
             
-            <div className="bg-[#282828] rounded-2xl p-6">
+            <div className="bg-[#282828] rounded-2xl p-6 border border-white/5">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-2xl font-bold text-white">45,201,093</p>

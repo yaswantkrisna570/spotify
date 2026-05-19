@@ -40,7 +40,7 @@ const HistoryDropdown = ({ onClose }) => {
               onClose();
             }}
           >
-            <img src={song.image} className="w-10 h-10 rounded object-cover" />
+            <img src={song.cover || 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop'} className="w-10 h-10 rounded object-cover" />
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-semibold text-white truncate">{song.title}</p>
               <p className="text-xs text-[#b3b3b3] truncate">{song.artist}</p>

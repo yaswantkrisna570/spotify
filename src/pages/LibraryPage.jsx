@@ -3,10 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, ListMusic, Users, RefreshCw, FolderPlus, Radio, UploadCloud, Heart, X, Grid } from 'lucide-react';
 import usePlayerStore from '../store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
 
 const LibraryPage = () => {
   const navigate = useNavigate();
-  const { likedSongs, customPlaylists, createPlaylist, importTrack, createFolder, startJam, activeJam, folders, remotePlaylists } = usePlayerStore();
+  const { likedSongs, customPlaylists, createPlaylist, importTrack, createFolder, startJam, activeJam, folders, remotePlaylists } = usePlayerStore(useShallow(state => ({
+    likedSongs: state.likedSongs,
+    customPlaylists: state.customPlaylists,
+    createPlaylist: state.createPlaylist,
+    importTrack: state.importTrack,
+    createFolder: state.createFolder,
+    startJam: state.startJam,
+    activeJam: state.activeJam,
+    folders: state.folders,
+    remotePlaylists: state.remotePlaylists
+  })));
   const [activeFilter, setActiveFilter] = useState('Playlists');
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
@@ -65,8 +76,8 @@ const LibraryPage = () => {
         id: `local-${Date.now()}`,
         title: file.name.replace(/\.[^/.]+$/, ""),
         artist: 'Local File',
-        image: 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop',
-        audioUrl: url
+        cover: 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop',
+        audio: url
       });
       setModalType(null);
       setActiveFilter('Playlists');

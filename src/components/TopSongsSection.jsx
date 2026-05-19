@@ -2,9 +2,17 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Play, TrendingUp } from 'lucide-react';
 import usePlayerStore from '../store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
+import DynamicArtwork from './DynamicArtwork';
 
 const TopSongsSection = () => {
-  const { playCounts, allSongs, setQueue, currentTrack, isPlaying } = usePlayerStore();
+  const { playCounts, allSongs, setQueue, currentTrack, isPlaying } = usePlayerStore(useShallow(state => ({
+    playCounts: state.playCounts,
+    allSongs: state.allSongs,
+    setQueue: state.setQueue,
+    currentTrack: state.currentTrack,
+    isPlaying: state.isPlaying
+  })));
 
   // Sort all songs by play count
   const topSongs = Object.entries(playCounts)
@@ -35,7 +43,12 @@ const TopSongsSection = () => {
             onClick={() => setQueue(topSongs, index)}
           >
             <div className="relative shrink-0">
-              <img src={song.image} alt={song.title} className="w-12 h-12 rounded shadow-lg" />
+              <DynamicArtwork 
+                artist={song.artist} 
+                title={song.title} 
+                cover={song.cover} 
+                className="w-12 h-12 rounded shadow-lg" 
+              />
               <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded">
                 <Play size={16} fill="white" className="text-white" />
               </div>

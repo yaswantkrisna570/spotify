@@ -62,10 +62,16 @@
                 const installingWorker = reg.installing;
                 installingWorker.onstatechange = () => {
                   if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    console.log('New content available, please refresh.');
+                    console.log('New update available.');
+                    window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: reg }));
                   }
                 };
               };
+              
+              // If waiting worker exists on load
+              if (reg.waiting) {
+                window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: reg }));
+              }
             })
             .catch(err => console.error('Service Worker registration failed', err));
         });

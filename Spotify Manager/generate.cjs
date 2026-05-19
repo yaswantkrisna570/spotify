@@ -4,163 +4,340 @@ const cloudinary = require("cloudinary").v2;
 const fs = require("fs-extra");
 const path = require("path");
 const axios = require("axios");
+const mm = require("music-metadata");
+const sharp = require("sharp");
 
-// Cloudinary config
+// =========================
+// CLOUDINARY CONFIG
+// =========================
+
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name:
+    process.env.CLOUDINARY_CLOUD_NAME,
+
+  api_key:
+    process.env.CLOUDINARY_API_KEY,
+
+  api_secret:
+    process.env.CLOUDINARY_API_SECRET,
 });
 
-// IMPORTANT:
-// Now reading from COMPRESSED folder
-const playlistsFolder = path.join(__dirname, "compressed");
+// =========================
+// FOLDERS
+// =========================
 
-const outputFolder = path.join(__dirname, "generated-json");
+const playlistsFolder = path.join(
+  __dirname,
+  "compressed"
+);
 
-// Create generated-json folder if missing
+const outputFolder = path.join(
+  __dirname,
+  "generated-json"
+);
+
 if (!fs.existsSync(outputFolder)) {
   fs.mkdirSync(outputFolder);
 }
 
-// Upload file to Cloudinary
-async function uploadToCloudinary(
-  filePath,
-  folder,
-  resourceType
-) {
-  const result = await cloudinary.uploader.upload(filePath, {
-    folder,
-    resource_type: resourceType,
-  });
+// =========================
+// CLEAN TEXT
+// =========================
 
-  return result.secure_url;
+function cleanText(text) {
+  return text
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\(.*?\)/g, "")
+    .replace(/\[.*?\]/g, "")
+    .replace(/official/gi, "")
+    .replace(/video/gi, "")
+    .replace(/audio/gi, "")
+    .replace(/lyrics/gi, "")
+    .replace(/full song/gi, "")
+    .replace(/mp3/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-// Fetch cover image automatically
-async function getCoverImage(title, artist) {
+// =========================
+// EXTRACT EMBEDDED COVER
+// =========================
+
+async function extractEmbeddedCover(
+  songPath,
+  outputPath
+) {
   try {
-    const query = `${title} ${artist}`;
+    const metadata =
+      await mm.parseFile(songPath);
 
-    const response = await axios.get(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(
-        query
-      )}&limit=1`
-    );
+    const picture =
+      metadata.common.picture?.[0];
 
-    if (response.data.results.length > 0) {
-      return response.data.results[0].artworkUrl100.replace(
+    if (!picture) {
+      return null;
+    }
+
+    await sharp(picture.data)
+      .resize(500, 500)
+      .webp({ quality: 80 })
+      .toFile(outputPath);
+
+    return outputPath;
+  } catch {
+    return null;
+  }
+}
+
+// =========================
+// FETCH ONLINE ARTWORK
+// =========================
+
+async function fetchOnlineArtwork(
+  title,
+  artist
+) {
+  // ========= DEEZER =========
+
+  try {
+    const deezer =
+      await axios.get(
+        `https://api.deezer.com/search?q=${encodeURIComponent(
+          `${title} ${artist}`
+        )}`
+      );
+
+    const song =
+      deezer.data?.data?.[0];
+
+    if (song?.album?.cover_xl) {
+      return song.album.cover_xl;
+    }
+  } catch {}
+
+  // ========= ITUNES =========
+
+  try {
+    const itunes =
+      await axios.get(
+        `https://itunes.apple.com/search?term=${encodeURIComponent(
+          `${title} ${artist}`
+        )}&limit=1`
+      );
+
+    const result =
+      itunes.data?.results?.[0];
+
+    if (result?.artworkUrl100) {
+      return result.artworkUrl100.replace(
         "100x100",
         "1000x1000"
       );
     }
+  } catch {}
 
-    return null;
-  } catch (error) {
-    console.log("❌ Cover fetch failed");
-    return null;
+  return "";
+}
+
+// =========================
+// GET SONG METADATA
+// =========================
+
+async function getSongMetadata(
+  filename,
+  filePath
+) {
+  try {
+    const metadata =
+      await mm.parseFile(filePath);
+
+    const title =
+      metadata.common.title ||
+      cleanText(filename);
+
+    const artist =
+      metadata.common.artist ||
+      "Unknown Artist";
+
+    const onlineCover =
+      await fetchOnlineArtwork(
+        title,
+        artist
+      );
+
+    return {
+      title,
+      artist,
+      cover: onlineCover,
+    };
+  } catch {
+    return {
+      title: cleanText(filename),
+      artist: "Unknown Artist",
+      cover: "",
+    };
   }
 }
 
-// Main process
+// =========================
+// UPLOAD AUDIO
+// =========================
+
+async function uploadAudio(
+  filePath,
+  folder
+) {
+  const result =
+    await cloudinary.uploader.upload(
+      filePath,
+      {
+        folder,
+        resource_type: "video",
+      }
+    );
+
+  return result.secure_url;
+}
+
+// =========================
+// UPLOAD IMAGE
+// =========================
+
+async function uploadImage(
+  filePath,
+  folder
+) {
+  const result =
+    await cloudinary.uploader.upload(
+      filePath,
+      {
+        folder,
+      }
+    );
+
+  return result.secure_url;
+}
+
+// =========================
+// PROCESS PLAYLISTS
+// =========================
+
 async function processPlaylists() {
-  // Check compressed folder exists
-  if (!fs.existsSync(playlistsFolder)) {
-    console.log("❌ compressed folder not found!");
-    return;
-  }
-
-  const playlists = fs.readdirSync(playlistsFolder);
-
-  if (playlists.length === 0) {
-    console.log("❌ No playlists found!");
-    return;
-  }
+  const playlists =
+    fs.readdirSync(playlistsFolder);
 
   for (const playlistName of playlists) {
-    // IMPORTANT:
-    // Songs now directly inside compressed/<playlist>
     const songsFolder = path.join(
       playlistsFolder,
       playlistName
     );
 
-    if (!fs.existsSync(songsFolder)) {
-      console.log(`❌ Folder missing: ${playlistName}`);
-      continue;
-    }
-
-    const files = fs.readdirSync(songsFolder);
-
-    // Filter mp3 files only
-    const mp3Files = files.filter((file) =>
-      file.toLowerCase().endsWith(".mp3")
-    );
-
-    if (mp3Files.length === 0) {
-      console.log(`❌ No mp3 songs inside ${playlistName}`);
-      continue;
-    }
+    const files = fs
+      .readdirSync(songsFolder)
+      .filter((file) =>
+        file.endsWith(".mp3")
+      );
 
     const songs = [];
 
-    for (const file of mp3Files) {
-      console.log(`\n🎵 Processing: ${file}`);
+    for (const file of files) {
+      try {
+        console.log(
+          `\n🎵 Processing: ${file}`
+        );
 
-      const fullPath = path.join(songsFolder, file);
+        const fullPath = path.join(
+          songsFolder,
+          file
+        );
 
-      const nameWithoutExt = path.parse(file).name;
+        const fileNameWithoutExt =
+          path.parse(file).name;
 
-      // Split title and artist
-      const split = nameWithoutExt.split(" - ");
+        // ========= METADATA =========
 
-      const title = split[0] || "Unknown";
-      const artist = split[1] || "Unknown";
+        const metadata =
+          await getSongMetadata(
+            fileNameWithoutExt,
+            fullPath
+          );
 
-      // Upload MP3
-      const audioUrl = await uploadToCloudinary(
-        fullPath,
-        `spotify-clone/${playlistName}/songs`,
-        "video"
-      );
+        // ========= EMBEDDED COVER =========
 
-      // Fetch cover image
-      const coverImage = await getCoverImage(
-        title,
-        artist
-      );
+        const tempCover =
+          path.join(
+            __dirname,
+            "temp-cover.webp"
+          );
 
-      let coverUrl = "";
+        const embeddedCover =
+          await extractEmbeddedCover(
+            fullPath,
+            tempCover
+          );
 
-      // Upload cover image
-      if (coverImage) {
-        try {
-          const imageUpload =
-            await cloudinary.uploader.upload(
-              coverImage,
-              {
-                folder: `spotify-clone/${playlistName}/covers`,
-              }
+        // ========= AUDIO =========
+
+        const audioUrl =
+          await uploadAudio(
+            fullPath,
+            `spotify-clone/${playlistName}/songs`
+          );
+
+        // ========= COVER =========
+
+        let coverUrl =
+          metadata.cover;
+
+        // ONLY use embedded cover
+        // if online cover unavailable
+
+        if (
+          embeddedCover &&
+          !coverUrl
+        ) {
+          coverUrl =
+            await uploadImage(
+              embeddedCover,
+              `spotify-clone/${playlistName}/covers`
             );
-
-          coverUrl = imageUpload.secure_url;
-        } catch {
-          console.log("❌ Cover upload failed");
         }
+
+        // ========= SONG OBJECT =========
+
+        songs.push({
+          id:
+            Date.now().toString() +
+            Math.random()
+              .toString(36)
+              .substring(2, 8),
+
+          title:
+            metadata.title ||
+            fileNameWithoutExt,
+
+          artist:
+            metadata.artist ||
+            "Unknown Artist",
+
+          cover: coverUrl || "",
+
+          audio: audioUrl,
+        });
+
+        console.log(
+          `✅ ${metadata.title} - ${metadata.artist}`
+        );
+      } catch (err) {
+        console.log(
+          `❌ Failed: ${file}`
+        );
       }
-
-      // Add song object
-      songs.push({
-        title,
-        artist,
-        audio: audioUrl,
-        cover: coverUrl,
-      });
-
-      console.log(`✅ Finished: ${title}`);
     }
 
-    // Save JSON
+    // ========= SAVE JSON =========
+
     const outputPath = path.join(
       outputFolder,
       `${playlistName}.json`
@@ -172,10 +349,9 @@ async function processPlaylists() {
     );
 
     console.log(
-      `\n🔥 JSON created: ${playlistName}.json`
+      `\n🔥 JSON CREATED: ${playlistName}.json`
     );
   }
 }
 
-// Start process
 processPlaylists();

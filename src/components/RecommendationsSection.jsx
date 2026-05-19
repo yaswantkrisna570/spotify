@@ -2,10 +2,15 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Play } from 'lucide-react';
 import usePlayerStore from '../store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
 import { masterLibrary } from '../constants/playlists';
 
 const RecommendationsSection = () => {
-  const { recentlyPlayed, setQueue, allSongs } = usePlayerStore();
+  const { recentlyPlayed, setQueue, allSongs } = usePlayerStore(useShallow(state => ({
+    recentlyPlayed: state.recentlyPlayed,
+    setQueue: state.setQueue,
+    allSongs: state.allSongs
+  })));
   
   const recommendations = React.useMemo(() => {
     const songsToUse = allSongs.length > 0 ? allSongs : (masterLibrary?.all || []);
@@ -40,7 +45,7 @@ const RecommendationsSection = () => {
             onClick={() => setQueue([song], 0)}
           >
             <div className="relative w-12 h-12 shrink-0">
-              <img src={song.image} alt="" className="w-full h-full rounded object-cover shadow-md" />
+              <img src={song.cover || 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop'} alt="" className="w-full h-full rounded object-cover shadow-md" />
               <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded">
                 <Play size={16} fill="currentColor" className="text-white" />
               </div>

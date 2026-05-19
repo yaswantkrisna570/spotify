@@ -38,7 +38,7 @@ const usePlayerStore = create(
         audio.addEventListener('timeupdate', () => {
           if (!get().isSeeking) {
             const current = audio.currentTime;
-            const dur = isFinite(audio.duration) ? audio.duration : 0;
+            const dur = isFinite(audio.duration) ? audio.duration : get().duration;
             set({ currentTime: current, duration: dur });
 
             // Trigger subtle fade out near the end if not already fading
@@ -65,13 +65,26 @@ const usePlayerStore = create(
           get().nextTrack();
         });
         audio.addEventListener('loadedmetadata', () => {
-          set({ duration: isFinite(audio.duration) ? audio.duration : 0 });
+          const dur = isFinite(audio.duration) ? audio.duration : 0;
+          set({ duration: dur });
+          if (dur > 0 && get().currentTrack) {
+            get().setSongDuration(get().currentTrack.id, dur);
+          }
           audio.volume = get().volume;
           
           // Use the persisted currentTime if we're in the initial seek state
           if (get()._needsInitialSeek && get().currentTime > 0) {
             audio.currentTime = get().currentTime;
             set({ _needsInitialSeek: false });
+          }
+        });
+        
+        audio.addEventListener('durationchange', () => {
+          if (isFinite(audio.duration)) {
+            set({ duration: audio.duration });
+            if (get().currentTrack) {
+              get().setSongDuration(get().currentTrack.id, audio.duration);
+            }
           }
         });
         
@@ -144,10 +157,10 @@ const usePlayerStore = create(
           const { currentTrack, volume } = get();
           if (!currentTrack) return;
           
-          const isCorrectSource = audio.src && audio.src.includes(currentTrack.audioUrl);
+          const isCorrectSource = audio.src && audio.src.endsWith(currentTrack.audio);
           
           if (!isCorrectSource) {
-            audio.src = currentTrack.audioUrl;
+            audio.src = currentTrack.audio;
             audio.load();
             audio.volume = 0; // Start from zero for fade in
           }
@@ -174,28 +187,32 @@ const usePlayerStore = create(
           const track = queue?.[idx];
           if (!track) return;
           
+          const safeTrack = {
+            ...track,
+            title: track.title || 'Untitled',
+            artist: track.artist || 'Unknown Artist'
+          };
+
           const playNew = () => {
             try {
-              audio.src = track.audioUrl;
+              audio.src = safeTrack.audio;
               audio.volume = 0;
               audio.load();
               audio.play().then(() => {
-                // Smooth fade in
                 fadeAudio(volume, 1200);
                 get().preloadNextTrack();
               }).catch(e => {
                 console.warn("Playback failed", e);
                 set({ error: "Failed to play track. Checking source..." });
               });
-              set({ currentTrack: track, currentSongIndex: idx, currentTime: 0, isLoading: true, _needsInitialSeek: false, _isFadingOut: false });
-              get().addToRecentlyPlayed(track);
+              set({ currentTrack: safeTrack, currentSongIndex: idx, currentTime: 0, duration: 0, isLoading: true, _needsInitialSeek: false, _isFadingOut: false });
+              get().addToRecentlyPlayed(safeTrack);
             } catch (err) {
               console.error("Critical playback error:", err);
             }
           };
 
           if (isPlaying) {
-            // Quick fade out of current track
             fadeAudio(0, 300, playNew);
           } else {
             playNew();
@@ -354,7 +371,7 @@ const usePlayerStore = create(
           try {
             const name = typeof payload === 'string' ? payload : (payload.name || `My Playlist #${s.customPlaylists.length + 1}`);
             const desc = typeof payload === 'object' ? payload.description : '';
-            const img = (typeof payload === 'object' && payload.image) ? payload.image : 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop';
+            const img = (typeof payload === 'object' && payload.cover) ? payload.cover : 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop';
             const isCollab = typeof payload === 'object' ? payload.isCollaborative : false;
             const isBlend = typeof payload === 'object' ? payload.isBlend : false;
             const songs = typeof payload === 'object' && payload.songs ? payload.songs : [];
@@ -405,7 +422,7 @@ const usePlayerStore = create(
                 id: localFilesId,
                 title: 'Local Files',
                 artist: 'You',
-                image: 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop',
+                cover: 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop',
                 description: 'Your imported tracks',
                 gradient: 'from-[#006450] to-black',
                 songs: [track],
@@ -432,11 +449,11 @@ const usePlayerStore = create(
           }
           
           const nextTrack = queue[nextIdx];
-          if (nextTrack && nextTrack.audioUrl) {
+          if (nextTrack && nextTrack.audio) {
             const link = document.createElement('link');
             link.rel = 'preload';
             link.as = 'audio';
-            link.href = nextTrack.audioUrl;
+            link.href = nextTrack.audio;
             document.head.appendChild(link);
             // Limit preloads to avoid excessive bandwidth
             setTimeout(() => document.head.removeChild(link), 10000);
@@ -483,7 +500,7 @@ const usePlayerStore = create(
           if (state.currentTrack) {
             // Use setTimeout to ensure the Audio object is ready and not in a weird state
             setTimeout(() => {
-              audio.src = state.currentTrack.audioUrl;
+              audio.src = state.currentTrack.audio;
               audio.volume = state.volume;
               audio.load();
             }, 100);

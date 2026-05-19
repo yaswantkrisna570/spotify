@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Play, MoreVertical } from 'lucide-react';
 import SongDuration from './SongDuration';
+import DynamicArtwork from './DynamicArtwork';
 
 const SongItem = React.memo(({ song, index, allSongs, setQueue, currentTrackId, isPlaying, likedSongs, toggleLike }) => {
   const isCurrent = currentTrackId === song.id;
@@ -15,7 +16,12 @@ const SongItem = React.memo(({ song, index, allSongs, setQueue, currentTrackId, 
       className="flex items-center gap-3 p-2 rounded-md transition-colors group cursor-pointer active:bg-white/10"
       onClick={() => setQueue(allSongs, index)}
     >
-      <img src={song.image} alt="" className="w-12 h-12 object-cover rounded shadow-md" loading="lazy" decoding="async" />
+      <DynamicArtwork 
+        artist={song.artist} 
+        title={song.title} 
+        cover={song.cover} 
+        className="w-12 h-12 rounded shadow-md shrink-0" 
+      />
       <div className="flex-1 overflow-hidden">
         <h4 className={`font-semibold truncate text-[15px] ${isCurrent ? 'text-spotify-green' : 'text-white'}`}>{song.title}</h4>
         <p className="text-xs text-[#b3b3b3] truncate">{song.artist}</p>
