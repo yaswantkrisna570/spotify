@@ -28,6 +28,18 @@ const fadeAudio = (targetVolume, duration = 1000, onComplete = null) => {
   requestAnimationFrame(animate);
 };
 
+// Global Normalizer to fix stale cache objects and prevent "Failed to play track"
+export const normalizeTrack = (track) => {
+  if (!track) return null;
+  return {
+    ...track,
+    title: track.title || 'Untitled',
+    artist: track.artist || 'Unknown Artist',
+    audio: track.audio || track.url || '',
+    cover: track.cover || track.image || 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop'
+  };
+};
+
 const usePlayerStore = create(
   persist(
     (set, get) => {
@@ -157,10 +169,16 @@ const usePlayerStore = create(
           const { currentTrack, volume } = get();
           if (!currentTrack) return;
           
-          const isCorrectSource = audio.src && audio.src.endsWith(currentTrack.audio);
+          const safeTrack = normalizeTrack(currentTrack);
+          if (!safeTrack.audio) {
+            get().showToast('Invalid audio source. Please select another track.', 'error');
+            return;
+          }
+          
+          const isCorrectSource = audio.src && audio.src.endsWith(safeTrack.audio);
           
           if (!isCorrectSource) {
-            audio.src = currentTrack.audio;
+            audio.src = safeTrack.audio;
             audio.load();
             audio.volume = 0; // Start from zero for fade in
           }
@@ -187,11 +205,12 @@ const usePlayerStore = create(
           const track = queue?.[idx];
           if (!track) return;
           
-          const safeTrack = {
-            ...track,
-            title: track.title || 'Untitled',
-            artist: track.artist || 'Unknown Artist'
-          };
+          const safeTrack = normalizeTrack(track);
+          if (!safeTrack.audio) {
+            get().showToast('Invalid audio source. Skipping track...', 'error');
+            get().nextTrack();
+            return;
+          }
 
           const playNew = () => {
             try {
@@ -227,11 +246,12 @@ const usePlayerStore = create(
 
         addToRecentlyPlayed: (track) => {
           if (!track) return;
+          const safeTrack = normalizeTrack(track);
           set((state) => {
-            const filtered = state.recentlyPlayed.filter((t) => t.id !== track.id);
-            const newPlayCounts = { ...state.playCounts, [track.id]: (state.playCounts[track.id] || 0) + 1 };
+            const filtered = state.recentlyPlayed.filter((t) => t.id !== safeTrack.id);
+            const newPlayCounts = { ...state.playCounts, [safeTrack.id]: (state.playCounts[safeTrack.id] || 0) + 1 };
             return {
-              recentlyPlayed: [track, ...filtered].slice(0, 10),
+              recentlyPlayed: [safeTrack, ...filtered].slice(0, 10),
               playCounts: newPlayCounts
             };
           });
@@ -300,7 +320,8 @@ const usePlayerStore = create(
         },
 
         setQueue: (tracks, idx = 0) => {
-          set({ queue: tracks, currentSongIndex: idx });
+          const safeTracks = (tracks || []).map(normalizeTrack);
+          set({ queue: safeTracks, currentSongIndex: idx });
           get().setTrackByIndex(idx);
         },
 
@@ -332,8 +353,9 @@ const usePlayerStore = create(
         toggleFullScreen: () => set(s => ({ isFullScreen: !s.isFullScreen })),
         toggleLike: (track) => set(s => {
           if (!track) return s;
-          const isLiked = s.likedSongs.some(t => t.id === track.id);
-          return { likedSongs: isLiked ? s.likedSongs.filter(t => t.id !== track.id) : [...s.likedSongs, track] };
+          const safeTrack = normalizeTrack(track);
+          const isLiked = s.likedSongs.some(t => t.id === safeTrack.id);
+          return { likedSongs: isLiked ? s.likedSongs.filter(t => t.id !== safeTrack.id) : [...s.likedSongs, safeTrack] };
         }),
         toggleShuffle: () => set(s => ({ isShuffle: !s.isShuffle })),
         toggleRepeat: () => set(s => {
@@ -408,12 +430,13 @@ const usePlayerStore = create(
         endJam: () => set({ activeJam: null }),
         importTrack: (track) => set(s => {
           if (!track) return s;
+          const safeTrack = normalizeTrack(track);
           const localFilesId = 'custom-local-files';
           const localFilesList = s.customPlaylists.find(p => p.id === localFilesId);
           if (localFilesList) {
             return {
               customPlaylists: s.customPlaylists.map(p => 
-                p.id === localFilesId ? { ...p, songs: [...p.songs, track] } : p
+                p.id === localFilesId ? { ...p, songs: [...p.songs, safeTrack] } : p
               )
             };
           } else {
@@ -425,7 +448,7 @@ const usePlayerStore = create(
                 cover: 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=200&h=200&fit=crop',
                 description: 'Your imported tracks',
                 gradient: 'from-[#006450] to-black',
-                songs: [track],
+                songs: [safeTrack],
                 isCollaborative: false,
                 isBlend: false
               }]
@@ -448,7 +471,7 @@ const usePlayerStore = create(
             nextIdx = (currentSongIndex + 1) % queue.length;
           }
           
-          const nextTrack = queue[nextIdx];
+          const nextTrack = normalizeTrack(queue[nextIdx]);
           if (nextTrack && nextTrack.audio) {
             const link = document.createElement('link');
             link.rel = 'preload';
@@ -496,8 +519,20 @@ const usePlayerStore = create(
           state.isLoading = false;
           state._needsInitialSeek = state.currentTime > 0;
 
+          // Normalize all state arrays to clean up old cache data
+          if (state.likedSongs) state.likedSongs = state.likedSongs.map(normalizeTrack).filter(Boolean);
+          if (state.recentlyPlayed) state.recentlyPlayed = state.recentlyPlayed.map(normalizeTrack).filter(Boolean);
+          if (state.queue) state.queue = state.queue.map(normalizeTrack).filter(Boolean);
+          if (state.currentTrack) state.currentTrack = normalizeTrack(state.currentTrack);
+          if (state.customPlaylists) {
+            state.customPlaylists = state.customPlaylists.map(p => ({
+              ...p,
+              songs: (p.songs || []).map(normalizeTrack).filter(Boolean)
+            }));
+          }
+
           // Initialize audio source with persisted track but keep it paused
-          if (state.currentTrack) {
+          if (state.currentTrack && state.currentTrack.audio) {
             // Use setTimeout to ensure the Audio object is ready and not in a weird state
             setTimeout(() => {
               audio.src = state.currentTrack.audio;
